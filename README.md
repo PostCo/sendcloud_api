@@ -151,7 +151,7 @@ valid = SendcloudAPI::WebhookSignature.verify(
 ```
 
 Pass the unparsed body, because a parsed and encoded body has different bytes. The comparison runs in constant time.
-A missing, malformed, or wrong signature returns `false`. A body that is not a String or an empty secret raises `ArgumentError`.
+A missing or wrong signature returns `false`, as does any value that is not 64 ASCII hex characters, whatever its encoding. A body that is not a String or an empty secret raises `ArgumentError`.
 
 ## Requests and responses
 

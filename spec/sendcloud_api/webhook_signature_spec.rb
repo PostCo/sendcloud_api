@@ -23,6 +23,18 @@ RSpec.describe SendcloudAPI::WebhookSignature do
     end
   end
 
+  it "rejects a signature that is not 64 ASCII hex characters in any encoding" do
+    [
+      ("a" * 63 + "\xFF").dup.force_encoding(Encoding::UTF_8),
+      "\xFF".b * 64,
+      "#{signature}\n",
+      signature.tr("0-9a-f", "０-９ａ-ｆ"),
+      signature.encode(Encoding::UTF_16LE)
+    ].each do |value|
+      expect(described_class.verify(raw_body, value, secret)).to be(false), "accepted #{value.inspect}"
+    end
+  end
+
   it "refuses a parsed body or a missing secret" do
     expect { described_class.verify(JSON.parse(raw_body), signature, secret) }.to raise_error(ArgumentError, /unparsed request body/)
     expect { described_class.verify(raw_body, signature, "") }.to raise_error(ArgumentError, "secret must be a non-empty String")
