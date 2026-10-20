@@ -150,6 +150,8 @@ RSpec.describe SendcloudAPI::Connection do
   end
 
   {
+    "HTTP 404 from GET /returns/999999999, captured 2026-10-20 (guide live-lanes-5e56146.txt, lane 4)" =>
+      ["return_not_found.json", 404, SendcloudAPI::NotFoundError, "No Return matches the given query."],
     "HTTP 400 from POST /shipping-options with country XX, captured 2026-10-18T17:03:57Z (run 20261019-routes)" =>
       ["shipping_options_invalid_country.json", 400, SendcloudAPI::BadRequestError,
         'validation_error Value error, Country XX does not exist. {"pointer":"/from_address/country_code"}'],

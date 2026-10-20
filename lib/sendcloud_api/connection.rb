@@ -68,6 +68,8 @@ module SendcloudAPI
     def request(method, path, params: {}, payload: nil, accept: JSON_MEDIA_TYPE, write: method != :get)
       raise ArgumentError, "path must be relative to the base URL, without a scheme or leading slash" if path.match?(NOT_RELATIVE_PATH)
 
+      raise ArgumentError, "path must not contain . or .. segments" if path.split(/[?#]/, 2).first.split("/").any? { |segment| segment == "." || segment == ".." }
+
       body = serialize(payload) unless payload.nil?
       redactor = @redactor.with_sensitive_values([payload, params])
       context = {request_method: method, request_path: redactor.filter_text(path.split("?").first)}
@@ -168,7 +170,9 @@ module SendcloudAPI
     end
 
     def error_details(body, status)
-      return unless body.is_a?(Hash) && body["errors"].is_a?(Array)
+      return unless body.is_a?(Hash)
+      return body["errors"] if body["errors"].is_a?(String)
+      return unless body["errors"].is_a?(Array)
 
       details = body["errors"].filter_map do |error|
         next unless error.is_a?(Hash)

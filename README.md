@@ -50,7 +50,7 @@ delete(path, params: {})
 Use endpoint paths relative to the configured base URL. Payloads are encoded as JSON without changing field names or amounts.
 HTTP redirects are returned as errors, without another request.
 A path or base URL that is not a valid URL raises `ArgumentError` before any request is sent. The message omits the value.
-A path that starts with `/` or a scheme such as `https:` also raises `ArgumentError` before sending. A leading `/` would replace the base URL's `/api/v3/`, and an absolute URL would send the Authorization header to another host.
+A path that starts with `/` or a scheme such as `https:`, or contains a `.` or `..` segment, also raises `ArgumentError` before sending. A leading `/` would replace the base URL's `/api/v3/`, and an absolute URL would send the Authorization header to another host.
 
 Each successful call returns a `SendcloudAPI::Response` with `status`, normalized lowercase `headers`, `body`, and `content_type`.
 `success?` identifies HTTP 200 through 299. `no_content?` identifies HTTP 204 or a nil body.
@@ -111,7 +111,7 @@ end
 
 HTTP errors expose `response`, `status`, `headers`, `body`, and `retry_after`.
 Their messages join each error's `code`, `field`, `message`, `title`, `detail`, and `source` values.
-That covers both Sendcloud error shapes: `{code, detail, source, status}` from validation and lookups, and `{code, field, message}` from returns.
+That covers Sendcloud's two error list shapes, `{code, detail, source, status}` and `{code, field, message}`, and a string `errors` value from return lookups.
 A `code` equal to the HTTP status is left out, so a returns 409 reads "HTTP 409: returns External reference has already been used in another return."
 The joined details are capped at 1,000 characters. The body keeps every error.
 

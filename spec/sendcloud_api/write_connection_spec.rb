@@ -94,6 +94,21 @@ RSpec.describe "Sendcloud write ambiguity" do
       expect(calls).to eq(0)
     end
 
+    [".", "..", "./test", "../test", "returns/./1", "returns/../1", "returns/.", "returns/..", "returns/../../user", "returns/..?limit=1"].each do |path|
+      it "rejects #{method} dot segment #{path} before dispatch" do
+        calls = 0
+        stubs = Faraday::Adapter::Test::Stubs.new { |stub|
+          stub.public_send(method, /.*/) {
+            calls += 1
+            json_response({})
+          }
+        }
+        options = %i[get delete].include?(method) ? {params: {}} : {payload: {}}
+        expect { build_client(stubs).connection.public_send(method, path, **options) }.to raise_error(ArgumentError, "path must not contain . or .. segments")
+        expect(calls).to eq(0)
+      end
+    end
+
     ["/test", "//evil.example/x", "https://evil.example/x", "HTTPS://evil.example/x", "mailto:a@evil.example"].each do |path|
       it "rejects #{method} #{path} before dispatch" do
         calls = 0
