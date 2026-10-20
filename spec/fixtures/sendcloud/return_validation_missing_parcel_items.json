@@ -1,0 +1,9 @@
+{
+  "errors": [
+    {
+      "code": 400,
+      "field": "parcel_items",
+      "message": "It's required to inform parcel_items for international returns"
+    }
+  ]
+}

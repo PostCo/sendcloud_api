@@ -1,0 +1,9 @@
+{
+  "errors": [
+    {
+      "code": 409,
+      "field": "returns",
+      "message": "External reference has already been used in another return."
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+# frozen_string_literal: true
+
+require "uri"
+
+module SendcloudAPI
+  class Redactor
+    FILTERED = "[FILTERED]"
+    CREDENTIAL_NAME = /authorization|authentication|password|passwd|secret|token|cookie|api[-_]?key|public[-_]?key/i
+    CREDENTIAL_ASSIGNMENT = /([\w-]*(?:#{CREDENTIAL_NAME.source})[\w-]*["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;&<>]+)/i
+    MINIMUM_EMBEDDED_BYTES = 8
+
+    def initialize(secrets = [], anywhere: false)
+      @secrets = secrets.grep(String).reject(&:empty?).uniq.freeze
+      @anywhere = anywhere
+      variants = @secrets.flat_map { |value| [value, URI.encode_www_form_component(value)] }.map(&:b).uniq.sort_by { |value| -value.bytesize }
+      short, long = variants.partition { |value| value.bytesize < MINIMUM_EMBEDDED_BYTES }
+      @all = union(variants)
+      @embedded = anywhere ? @all : union(long)
+      @whole = anywhere ? [].freeze : short.freeze
+    end
+
+    def with_sensitive_values(value)
+      self.class.new(@secrets + sensitive_values(value), anywhere: @anywhere)
+    end
+
+    def anywhere
+      self.class.new(@secrets, anywhere: true)
+    end
+
+    def filter(value)
+      case value
+      when Hash
+        value.to_h { |key, entry| [key, credential_name?(key) ? FILTERED : filter(entry)] }
+      when Array
+        value.map { |entry| filter(entry) }
+      when String
+        filter_secrets(value)
+      else
+        value
+      end
+    end
+
+    def filter_text(value)
+      filtered = value.b.gsub(@all, FILTERED)
+      filtered = filtered.gsub(%r{(https?://)[^\s/@]+:[^\s/@]+@}i, "\\1#{FILTERED}@")
+      filtered = filtered.gsub(/\b(Bearer|Basic)\s+[^\s,"'<>]+/i, "\\1 #{FILTERED}")
+      filtered.gsub(CREDENTIAL_ASSIGNMENT, "\\1#{FILTERED}").force_encoding(value.encoding)
+    end
+
+    def inspect
+      "#<#{self.class}>"
+    end
+
+    private
+
+    def credential_name?(key)
+      key.to_s.gsub(/[^a-z0-9]/i, "").match?(CREDENTIAL_NAME)
+    end
+
+    def filter_secrets(value)
+      bytes = value.b
+      return FILTERED.dup.force_encoding(value.encoding) if @whole.include?(bytes)
+
+      bytes.gsub(@embedded, FILTERED).force_encoding(value.encoding)
+    end
+
+    def union(values)
+      return /(?!)/n if values.empty?
+
+      Regexp.new(values.map { |value| Regexp.escape(value) }.join("|").b, Regexp::NOENCODING)
+    end
+
+    def sensitive_values(value)
+      case value
+      when Hash
+        value.flat_map { |key, entry| credential_name?(key) ? strings_in(entry) : sensitive_values(entry) }
+      when Array
+        value.flat_map { |entry| sensitive_values(entry) }
+      else
+        []
+      end
+    end
+
+    def strings_in(value)
+      case value
+      when Hash then value.values.flat_map { |entry| strings_in(entry) }
+      when Array then value.flat_map { |entry| strings_in(entry) }
+      when String then [value, value.sub(/\A(?:Bearer|Basic)\s+/i, "")]
+      else []
+      end
+    end
+  end
+end
