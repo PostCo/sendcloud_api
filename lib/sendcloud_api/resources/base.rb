@@ -18,8 +18,9 @@ module SendcloudAPI
       private
 
       def get(path, params: {}, allowed: [], accept: Connection::JSON_MEDIA_TYPE)
+        params = params.transform_keys { |key| key.is_a?(String) ? key.to_sym : key }
         unknown = params.keys - allowed
-        raise ArgumentError, "Unknown parameters: #{unknown.sort.join(", ")}" unless unknown.empty?
+        raise ArgumentError, "Unknown parameters: #{unknown.map(&:to_s).sort.join(", ")}" unless unknown.empty?
 
         connection.get(path, params: params.compact, accept: accept)
       end

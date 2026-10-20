@@ -38,7 +38,7 @@ client = SendcloudAPI::Client.new(
 ## Resources
 
 Each resource method sends one request and returns a `SendcloudAPI::Response` with Sendcloud's body unchanged.
-Payloads are Hashes with Sendcloud's JSON field names as String keys. List filters are keyword arguments with Sendcloud's query parameter names.
+Payloads are Hashes with Sendcloud's JSON field names as String keys. List filters are keyword arguments with Sendcloud's query parameter names, as Symbol or String keys.
 An unknown filter raises `ArgumentError` before any request is sent, because Sendcloud ignores unknown filters and returns every record.
 Ids and tracking numbers are required and are escaped into one path segment. A value of `.` or `..` raises `ArgumentError` before sending, because it would change the path.
 

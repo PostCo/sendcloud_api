@@ -76,6 +76,14 @@ RSpec.describe SendcloudAPI::Resources::Returns do
     expect { offline_client.returns.list(status: "open") }.to raise_error(ArgumentError, "Unknown parameters: status")
   end
 
+  it "accepts String filter keys and still rejects unknown ones" do
+    client = serve(:get, "returns", body: fixture("returns.json"))
+    client.returns.list("cursor" => "cD0yNDIxNTUwNA==", "page_size" => 1)
+
+    expect(request.params).to eq("cursor" => "cD0yNDIxNTUwNA==", "page_size" => "1")
+    expect { offline_client.returns.list("status" => "open", :cursr => "x") }.to raise_error(ArgumentError, "Unknown parameters: cursr, status")
+  end
+
   it "cancels a return with an empty PATCH body" do
     client = serve(:patch, "returns/24260544/cancel", status: 202, body: fixture("return_cancelled.json"))
     response = client.returns.cancel(id: 24260544)
