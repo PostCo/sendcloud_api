@@ -84,6 +84,20 @@ RSpec.describe SendcloudAPI::Connection do
     }
   end
 
+  [200, 204].each do |status|
+    it "rejects an empty HTTP #{status} body when the caller accepts a document" do
+      stubs = Faraday::Adapter::Test::Stubs.new do |stub|
+        stub.get("/api/v3/parcels/1/documents/label") { [status, {"Content-Type" => "image/png"}, ""] }
+      end
+      expect { build_client(stubs).connection.get("parcels/1/documents/label", accept: "image/png") }.to raise_error(
+        SendcloudAPI::ParseError, "Sendcloud returned an empty body instead of image/png"
+      ) { |error|
+        expect(error).not_to be_ambiguous
+        expect(error.status).to eq(status)
+      }
+    end
+  end
+
   ["application/json; charset=utf-8", "application/vnd.api+json", nil].each do |content_type|
     it "parses JSON for #{content_type.inspect}" do
       stubs = Faraday::Adapter::Test::Stubs.new do |stub|
@@ -143,10 +157,10 @@ RSpec.describe SendcloudAPI::Connection do
       ["contract_not_found.json", 404, SendcloudAPI::NotFoundError, "not_found Not found"],
     "HTTP 409 from POST /returns with a used reference, captured 2026-10-18T17:07:55Z (run 20261019-returns)" =>
       ["return_duplicate_reference.json", 409, SendcloudAPI::ConflictError,
-        "409 returns External reference has already been used in another return."],
+        "returns External reference has already been used in another return."],
     "HTTP 400 from POST /returns/validate without parcel_items, captured 2026-10-18T17:11:10Z (run 20261019-customs)" =>
       ["return_validation_missing_parcel_items.json", 400, SendcloudAPI::BadRequestError,
-        "400 parcel_items It's required to inform parcel_items for international returns"]
+        "parcel_items It's required to inform parcel_items for international returns"]
   }.each do |source, (name, status, error_class, details)|
     it "summarizes the Sendcloud #{source}" do
       stubs = Faraday::Adapter::Test::Stubs.new do |stub|

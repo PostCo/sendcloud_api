@@ -105,6 +105,34 @@ RSpec.describe "Sendcloud credential redaction" do
     )
   end
 
+  {
+    "a JSON rejection" => [400, "application/json", SendcloudAPI::BadRequestError],
+    "a text rejection" => [503, "text/plain", SendcloudAPI::ServerError],
+    "an unexpected success format" => [200, "text/html", SendcloudAPI::ParseError]
+  }.each do |source, (status, content_type, error_class)|
+    it "removes a short learned credential anywhere in #{source}" do
+      text = "Login with hunter2 was refused"
+      body = (content_type == "application/json") ? JSON.generate({"errors" => [{"code" => "invalid", "field" => "contract_data", "message" => text}]}) : text
+      stubs = Faraday::Adapter::Test::Stubs.new do |stub|
+        stub.post("/api/v3/hunter2/contracts") { [status, {"Content-Type" => content_type, "X-Echo" => text}, body] }
+      end
+      expect { build_client(stubs).connection.post("hunter2/contracts", payload: {"contract_data" => {"password" => "hunter2"}}) }.to raise_error(error_class) { |error|
+        expect([error.message, error.body, error.headers, error.request_path].inspect).not_to include("hunter2")
+        expect(error.headers["x-echo"]).to eq("Login with [FILTERED] was refused")
+      }
+    end
+  end
+
+  it "keeps the error text around a removed short credential" do
+    stubs = stub_response(:post, 400, {"Content-Type" => "application/json"},
+      JSON.generate({"errors" => [{"code" => "invalid", "field" => "contract_data", "message" => "Login with hunter2 was refused"}]}))
+    expect { build_client(stubs).connection.post("test", payload: {"password" => "hunter2"}) }.to raise_error(
+      SendcloudAPI::BadRequestError, "Sendcloud request failed with HTTP 400: invalid contract_data Login with [FILTERED] was refused"
+    ) { |error|
+      expect(error.body).to eq("errors" => [{"code" => "invalid", "field" => "contract_data", "message" => "Login with [FILTERED] was refused"}])
+    }
+  end
+
   it "leaves free text in successful JSON alone" do
     body = {"name" => "Basic Letter", "address_2" => "Bearer Lane 4", "note" => "secret: none, door code 1",
             "tracking_url" => "https://t.example/track?id=1&X-Amz-Security-Token=abc&sig=2", "link" => "https://user:pass@t.example/"}

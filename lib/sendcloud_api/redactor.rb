@@ -9,16 +9,22 @@ module SendcloudAPI
     CREDENTIAL_ASSIGNMENT = /([\w-]*(?:#{CREDENTIAL_NAME.source})[\w-]*["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;&<>]+)/i
     MINIMUM_EMBEDDED_BYTES = 8
 
-    def initialize(secrets = [])
+    def initialize(secrets = [], anywhere: false)
       @secrets = secrets.grep(String).reject(&:empty?).uniq.freeze
-      variants = @secrets.flat_map { |value| [value, URI.encode_www_form_component(value)] }.uniq.map { |value| value.b.freeze }
-      embedded, whole = variants.partition { |value| value.bytesize >= MINIMUM_EMBEDDED_BYTES }
-      @embedded = embedded.sort_by { |value| -value.bytesize }.freeze
-      @whole = whole.freeze
+      @anywhere = anywhere
+      variants = @secrets.flat_map { |value| [value, URI.encode_www_form_component(value)] }.map(&:b).uniq.sort_by { |value| -value.bytesize }
+      short, long = variants.partition { |value| value.bytesize < MINIMUM_EMBEDDED_BYTES }
+      @all = union(variants)
+      @embedded = anywhere ? @all : union(long)
+      @whole = anywhere ? [].freeze : short.freeze
     end
 
     def with_sensitive_values(value)
-      self.class.new(@secrets + sensitive_values(value))
+      self.class.new(@secrets + sensitive_values(value), anywhere: @anywhere)
+    end
+
+    def anywhere
+      self.class.new(@secrets, anywhere: true)
     end
 
     def filter(value)
@@ -35,7 +41,7 @@ module SendcloudAPI
     end
 
     def filter_text(value)
-      filtered = filter_secrets(value).b
+      filtered = value.b.gsub(@all, FILTERED)
       filtered = filtered.gsub(%r{(https?://)[^\s/@]+:[^\s/@]+@}i, "\\1#{FILTERED}@")
       filtered = filtered.gsub(/\b(Bearer|Basic)\s+[^\s,"'<>]+/i, "\\1 #{FILTERED}")
       filtered.gsub(CREDENTIAL_ASSIGNMENT, "\\1#{FILTERED}").force_encoding(value.encoding)
@@ -55,7 +61,13 @@ module SendcloudAPI
       bytes = value.b
       return FILTERED.dup.force_encoding(value.encoding) if @whole.include?(bytes)
 
-      @embedded.reduce(bytes) { |text, secret| text.gsub(secret, FILTERED) }.force_encoding(value.encoding)
+      bytes.gsub(@embedded, FILTERED).force_encoding(value.encoding)
+    end
+
+    def union(values)
+      return /(?!)/n if values.empty?
+
+      Regexp.new(values.map { |value| Regexp.escape(value) }.join("|").b, Regexp::NOENCODING)
     end
 
     def sensitive_values(value)

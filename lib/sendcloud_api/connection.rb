@@ -65,20 +65,25 @@ module SendcloudAPI
     end
 
     def request(method, path, params: {}, payload: nil, accept: JSON_MEDIA_TYPE, write: method != :get)
+      raise ArgumentError, "path must be relative to the base URL, without a leading slash" if path.start_with?("/")
+
       body = serialize(payload) unless payload.nil?
       redactor = @redactor.with_sensitive_values([payload, params])
       context = {request_method: method, request_path: redactor.filter_text(path.split("?").first)}
 
       raw_response = dispatch(method, path, body, params, accept, context, write: write)
+      status = raw_response.status
+      success = (200..299).cover?(status)
       headers = raw_response.headers.to_h.transform_keys { |key| key.to_s.downcase }
-      kind, body, problem = decode(raw_response.status, raw_response.body, media_type(headers["content-type"]), accept.downcase)
+      kind, body, problem = decode(success, raw_response.body, media_type(headers["content-type"]), accept.downcase)
+      problem ||= "Sendcloud returned empty JSON" if write && body.nil? && status != 204
       redactor = redactor.with_sensitive_values([headers, body])
+      redactor = redactor.anywhere if problem || !success
       body = redactor.filter(body) if kind == :json
       body = redactor.filter_text(body) if kind == :text
-      response = Response.new(status: raw_response.status, headers: redactor.filter(headers), body: body)
+      response = Response.new(status: status, headers: redactor.filter(headers), body: body)
 
       raise_for_status!(response, redactor, context, write: write)
-      problem ||= "Sendcloud returned empty JSON" if write && body.nil? && response.status != 204
       raise ParseError.new(redactor.filter_text(problem), response: response, ambiguous: write, **context), cause: nil if problem
 
       response
@@ -108,18 +113,19 @@ module SendcloudAPI
       media_type == JSON_MEDIA_TYPE || media_type.end_with?("+json")
     end
 
-    def decode(status, body, media_type, accept)
+    def decode(success, body, media_type, accept)
+      return decode_document(body, media_type, accept) if success && !json_type?(accept)
       return [:json, nil, nil] if body.nil? || body.empty?
-
-      success = (200..299).cover?(status)
-      if success && !json_type?(accept)
-        return [:document, body.b, nil] if media_type == accept
-
-        return [:text, body.b, "Sendcloud returned #{media_type_name(media_type)} instead of #{accept}"]
-      end
       return parse_json(body) if media_type.empty? || json_type?(media_type)
 
       [:text, body.b, ("Sendcloud returned #{media_type_name(media_type)} instead of JSON" if success)]
+    end
+
+    def decode_document(body, media_type, accept)
+      return [:document, nil, "Sendcloud returned an empty body instead of #{accept}"] if body.nil? || body.empty?
+      return [:document, body.b, nil] if media_type == accept
+
+      [:text, body.b, "Sendcloud returned #{media_type_name(media_type)} instead of #{accept}"]
     end
 
     def media_type_name(media_type)
@@ -154,18 +160,19 @@ module SendcloudAPI
 
       error_class = ERROR_CLASSES.fetch(response.status) { (500..599).cover?(response.status) ? ServerError : Error }
       message = "Sendcloud request failed with HTTP #{response.status}"
-      details = error_details(response.body)
+      details = error_details(response.body, response.status)
       message += ": #{truncate(redactor.filter_text(details))}" if details
       raise error_class.new(message, response: response,
         ambiguous: write && (500..599).cover?(response.status), **context), cause: nil
     end
 
-    def error_details(body)
+    def error_details(body, status)
       return unless body.is_a?(Hash) && body["errors"].is_a?(Array)
 
       details = body["errors"].filter_map do |error|
         next unless error.is_a?(Hash)
 
+        error = error.except("code") if error["code"].to_s == status.to_s
         error.values_at("code", "field", "message", "title", "detail", "source")
           .compact.map { |value| value.is_a?(String) ? value : JSON.generate(value) }.join(" ")
       end.reject(&:empty?)

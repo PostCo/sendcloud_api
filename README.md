@@ -50,6 +50,7 @@ delete(path, params: {})
 Use endpoint paths relative to the configured base URL. Payloads are encoded as JSON without changing field names or amounts.
 HTTP redirects are returned as errors, without another request.
 A path or base URL that is not a valid URL raises `ArgumentError` before any request is sent. The message omits the value.
+A path that starts with `/` also raises `ArgumentError` before sending, because it would replace the base URL's `/api/v3/`.
 
 Each successful call returns a `SendcloudAPI::Response` with `status`, normalized lowercase `headers`, `body`, and `content_type`.
 `success?` identifies HTTP 200 through 299. `no_content?` identifies HTTP 204 or a nil body.
@@ -67,6 +68,7 @@ label.content_type # "image/png"
 
 A successful response in a different format than the caller expected raises `ParseError`.
 That includes HTML answering a JSON request and ZPL answering a PNG request. Sendcloud returns native ZPL labels as ZPL whatever the Accept header says.
+An empty successful response to a document request also raises `ParseError`.
 
 Some Sendcloud POST endpoints only read, such as shipping option searches and return validation.
 Pass `read_only: true` for those so their failures are never reported as ambiguous writes.
@@ -110,6 +112,7 @@ end
 HTTP errors expose `response`, `status`, `headers`, `body`, and `retry_after`.
 Their messages join each error's `code`, `field`, `message`, `title`, `detail`, and `source` values.
 That covers both Sendcloud error shapes: `{code, detail, source, status}` from validation and lookups, and `{code, field, message}` from returns.
+A `code` equal to the HTTP status is left out, so a returns 409 reads "HTTP 409: returns External reference has already been used in another return."
 The joined details are capped at 1,000 characters. The body keeps every error.
 
 `error.ambiguous?` is true for a POST, PUT, PATCH, or DELETE that fails in transport, receives HTTP 5xx, or returns an unreadable or unexpected response.
@@ -120,7 +123,8 @@ Invalid JSON input fails before dispatch and raises `JSON::GeneratorError`.
 
 The connection removes credentials before a response or error leaves it.
 It knows the configured keys and their Basic authorization value, and it learns more from submitted and returned fields whose names look like credentials.
-A known value of 8 or more bytes is removed wherever it appears. A shorter value is removed only where it is the whole string, so it cannot alter identifiers such as tracking numbers.
+In a successful response, a known value of 8 or more bytes is removed wherever it appears. A shorter value is removed only where it is the whole string, so it cannot alter identifiers such as tracking numbers.
+An error's message, body, headers, and request path lose every known value wherever it appears, whatever its length.
 Fields named like credentials are replaced with `[FILTERED]`. Field names are never changed.
 Successful JSON gets only those two rules, so ordinary text such as "Basic Letter" or a signed URL stays intact.
 Error messages and non-JSON error bodies also lose `Basic` and `Bearer` values, `name=value` or `name: value` credentials, and URL user information.
