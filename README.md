@@ -128,13 +128,17 @@ An integration update answers HTTP 204 with no body.
 
 ### Pagination
 
-List methods return one page. Pass the cursor from `SendcloudAPI::Pagination.next_cursor` to fetch the next one.
-It reads the `Link` header that contracts and invoice items use, and the body `next` URL that returns use, and returns `nil` on the last page.
+List methods return one page. `SendcloudAPI::Pagination.next_params(page, params)` returns the params for the next page, or `nil` on the last page.
+It keeps every filter in `params` and sets `cursor`. A Sendcloud cursor holds only a position, so a request with the cursor alone returns records the filters would exclude.
+It reads the `Link` header that contracts and invoice items use, and the body `next` URL that returns use. A next URL without exactly one cursor, or one that does not parse, raises `ParseError`.
 
 ```ruby
-page = client.invoice_items.list(page_size: 100)
-while (cursor = SendcloudAPI::Pagination.next_cursor(page))
-  page = client.invoice_items.list(page_size: 100, cursor: cursor)
+contracts = []
+params = {carrier_code: "dpd_gb", page_size: 100}
+while params
+  page = client.contracts.list(**params)
+  contracts.concat(page.body["data"])
+  params = SendcloudAPI::Pagination.next_params(page, params)
 end
 ```
 

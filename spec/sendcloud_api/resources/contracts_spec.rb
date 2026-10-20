@@ -9,20 +9,23 @@ RSpec.describe SendcloudAPI::Resources::Contracts do
     }
   end
 
-  it "lists contracts with filters and exposes the Link header cursor" do
+  it "lists contracts with filters and continues from the Link header with the same filters" do
     link = '<https://panel.sendcloud.sc/api/v3/contracts?cursor=cD0zNDg5MTc%3D&page_size=2>; rel="next"'
     client = serve(:get, "contracts", body: fixture("contracts.json"), headers: {"Link" => link})
-    response = client.contracts.list(carrier_code: "royal_mailv2", is_active: false, page_size: 2)
+    filters = {carrier_code: "royal_mailv2", is_active: false, page_size: 2}
+    response = client.contracts.list(**filters)
 
     expect(request.params).to eq("carrier_code" => "royal_mailv2", "is_active" => "false", "page_size" => "2")
     expect(response.body["data"].map { _1["id"] }).to eq([351090, 348920])
-    expect(SendcloudAPI::Pagination.next_cursor(response)).to eq("cD0zNDg5MTc=")
+
+    client.contracts.list(**SendcloudAPI::Pagination.next_params(response, filters))
+    expect(request.params).to eq("carrier_code" => "royal_mailv2", "is_active" => "false", "page_size" => "2", "cursor" => "cD0zNDg5MTc=")
   end
 
-  it "has no next cursor on the last page" do
+  it "has no next page params on the last page" do
     client = serve(:get, "contracts", body: fixture("contracts.json"))
 
-    expect(SendcloudAPI::Pagination.next_cursor(client.contracts.list)).to be_nil
+    expect(SendcloudAPI::Pagination.next_params(client.contracts.list, {})).to be_nil
   end
 
   it "creates a contract without exposing the carrier password" do

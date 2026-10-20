@@ -59,14 +59,17 @@ RSpec.describe SendcloudAPI::Resources::Returns do
     expect(body).not_to include("parcel_id", "external_reference")
   end
 
-  it "lists returns with filters and exposes the body cursor" do
+  it "lists returns with filters and continues from the body next URL with the same filters" do
     page = fixture("returns.json").merge("next" => "https://panel.sendcloud.sc/api/v3/returns?cursor=cD0yNDIxNTUwNA%3D%3D&page_size=1")
     client = serve(:get, "returns", body: page)
-    response = client.returns.list(page_size: 1, parent_parcel_status: "ready-to-send", cursor: nil)
+    filters = {page_size: 1, parent_parcel_status: "ready-to-send", cursor: nil}
+    response = client.returns.list(**filters)
 
     expect(request.params).to eq("page_size" => "1", "parent_parcel_status" => "ready-to-send")
     expect(response.body["data"].first["id"]).to eq(24215504)
-    expect(SendcloudAPI::Pagination.next_cursor(response)).to eq("cD0yNDIxNTUwNA==")
+
+    client.returns.list(**SendcloudAPI::Pagination.next_params(response, filters))
+    expect(request.params).to eq("page_size" => "1", "parent_parcel_status" => "ready-to-send", "cursor" => "cD0yNDIxNTUwNA==")
   end
 
   it "rejects unknown list filters before sending" do
