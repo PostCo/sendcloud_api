@@ -54,7 +54,7 @@ RSpec.describe SendcloudAPI::Client do
     end
     resource_class = Class.new(SendcloudAPI::Resources::Base) do
       def list(**params)
-        get("test", params: params)
+        get("test", params: params, allowed: %i[enabled cursor])
       end
 
       def create(payload:)

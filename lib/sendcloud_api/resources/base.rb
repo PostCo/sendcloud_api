@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "uri"
+
 module SendcloudAPI
   module Resources
     class Base
@@ -15,8 +17,19 @@ module SendcloudAPI
 
       private
 
-      def get(path, params: {})
-        connection.get(path, params: params.reject { |_, value| value.nil? })
+      def get(path, params: {}, allowed: [], accept: Connection::JSON_MEDIA_TYPE)
+        params = params.transform_keys { |key| key.is_a?(String) ? key.to_sym : key }
+        unknown = params.keys - allowed
+        raise ArgumentError, "Unknown parameters: #{unknown.map(&:to_s).sort.join(", ")}" unless unknown.empty?
+
+        connection.get(path, params: params.compact, accept: accept)
+      end
+
+      def segment(name, value)
+        require_parameter!(name, value)
+        raise ArgumentError, "#{name} cannot be . or .." if %w[. ..].include?(value.to_s)
+
+        URI.encode_www_form_component(value.to_s).gsub("+", "%20")
       end
 
       def validate_payload!(payload, *identifiers)

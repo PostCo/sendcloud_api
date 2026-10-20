@@ -1,0 +1,14 @@
+{
+  "data": {
+    "carrier": {
+      "code": "dpd_gb",
+      "name": "DPD UK"
+    },
+    "client_id": "postco-probe-fake",
+    "id": 355760,
+    "is_default_per_carrier": false,
+    "name": "PostCo probe fake DPD UK",
+    "state": "validating",
+    "type": "direct"
+  }
+}

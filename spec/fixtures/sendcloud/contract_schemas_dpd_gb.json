@@ -1,0 +1,33 @@
+{
+  "data": [
+    {
+      "carrier_code": "dpd_gb",
+      "fields": [
+        {
+          "description": "A name to help you identify this contract in Sendcloud. Only visible to you.",
+          "name": "name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "description": "The username which you use for the MyDPD Portal",
+          "name": "client_id",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "description": "The password which you use for the MyDPD Portal",
+          "name": "secret",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "description": "You can find the account numbers in the MyDPD Portal (MyDPD -> My Account Details)",
+          "name": "account_nr",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,110 @@
+{
+  "brand_id": null,
+  "collo_count": 1,
+  "contract": null,
+  "created_at": "2026-10-18T19:06:45.356600+02:00",
+  "customs_information": null,
+  "customs_invoice_nr": "",
+  "customs_shipment_type": null,
+  "delivered_at": null,
+  "delivered_at_iso": null,
+  "delivery_option": "drop_off_point",
+  "dimensions": {
+    "height": null,
+    "length": null,
+    "unit": "cm",
+    "width": null
+  },
+  "from_address": {
+    "address_line_1": "1 Example Street",
+    "address_line_2": "",
+    "city": "Example City",
+    "company_name": "Example Ltd",
+    "country_code": "GB",
+    "email": "person@example.com",
+    "house_number": "",
+    "name": "Example Person",
+    "phone_number": "+440000000000",
+    "postal_code": "EX1 1AA",
+    "state_province_code": null
+  },
+  "id": 24260544,
+  "images": [],
+  "insurance": false,
+  "is_cancellable": true,
+  "label": {
+    "label_printer": "https://panel.sendcloud.sc/api/v3/parcels/729017591/documents/label",
+    "normal_printer": [
+      "https://panel.sendcloud.sc/api/v3/parcels/729017591/documents/label?paper_size=a4",
+      "https://panel.sendcloud.sc/api/v3/parcels/729017591/documents/label?paper_size=a4",
+      "https://panel.sendcloud.sc/api/v3/parcels/729017591/documents/label?paper_size=a4",
+      "https://panel.sendcloud.sc/api/v3/parcels/729017591/documents/label?paper_size=a4"
+    ]
+  },
+  "label_cost": {
+    "currency": "GBP",
+    "value": 0.0
+  },
+  "label_url": "https://panel.sendcloud.sc/api/v3/parcels/729017591/documents/label",
+  "order_number": "PROBE-1001",
+  "parcel_items": [],
+  "reason": null,
+  "refund": null,
+  "return_fee": null,
+  "send_tracking_emails": false,
+  "shipping_option": {
+    "code": "sendcloud:letterreturn"
+  },
+  "shipping_product": {
+    "code": "sendcloud:letterreturn"
+  },
+  "status": "open",
+  "status_history": [
+    {
+      "carrier_code": "",
+      "carrier_message": "No label",
+      "carrier_update_timestamp": "2026-10-18 17:06:45.329648+00:00",
+      "parcel_status_history_id": "6531437799",
+      "parent_status": "no-label"
+    },
+    {
+      "carrier_code": "",
+      "carrier_message": "Being announced",
+      "carrier_update_timestamp": "2026-10-18 17:06:45.396547+00:00",
+      "parcel_status_history_id": "6531437802",
+      "parent_status": "announcing"
+    },
+    {
+      "carrier_code": "",
+      "carrier_message": "Ready to send",
+      "carrier_update_timestamp": "2026-10-18 17:06:45.637662+00:00",
+      "parcel_status_history_id": "6531437813",
+      "parent_status": "ready-to-send"
+    }
+  ],
+  "to_address": {
+    "address_line_1": "1 Example Street",
+    "address_line_2": "",
+    "city": "Example City",
+    "company_name": "Example Ltd",
+    "country_code": "GB",
+    "email": "person@example.com",
+    "house_number": "",
+    "name": "Example Person",
+    "phone_number": "+440000000000",
+    "po_box": "",
+    "postal_code": "EX1 1AA",
+    "state_province_code": null
+  },
+  "tracking_number": "SCEXAMPLE0001",
+  "tracking_numbers": [
+    {
+      "tracking_number": "SCEXAMPLE0001"
+    }
+  ],
+  "tracking_url": "https://tracking.example.com/track",
+  "weight": {
+    "unit": "kg",
+    "value": 0.5
+  }
+}

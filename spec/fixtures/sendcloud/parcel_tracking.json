@@ -1,0 +1,123 @@
+{
+  "data": {
+    "announced_at": "2026-10-18T17:08:44Z",
+    "contract": {
+      "id": "71427203",
+      "shipping_method_name": "Royal Mail Tracked 48 Returns QR - Small Parcel",
+      "type": "broker"
+    },
+    "created_at": "2026-10-18T17:08:44.804548Z",
+    "details": {
+      "brand_id": null,
+      "expected_delivery_date": null,
+      "integration_id": 637034,
+      "is_mail_box": null,
+      "is_return": true,
+      "is_to_service_point": null
+    },
+    "events": [
+      {
+        "description": "Cancelled",
+        "event_at": "2026-10-18T17:10:06Z",
+        "event_type": "internal",
+        "exception": "cancelled",
+        "phase": "none",
+        "status_type": "warning",
+        "sub_status": "none"
+      },
+      {
+        "description": "Cancellation requested",
+        "event_at": "2026-10-18T17:10:05Z",
+        "event_type": "internal",
+        "exception": "cancelling",
+        "phase": "none",
+        "status_type": "warning",
+        "sub_status": "none"
+      },
+      {
+        "description": "Cancellation requested",
+        "event_at": "2026-10-18T17:10:04Z",
+        "event_type": "internal",
+        "exception": "cancelling",
+        "phase": "none",
+        "status_type": "warning",
+        "sub_status": "none"
+      },
+      {
+        "description": "Parcel has been labelled",
+        "event_at": "2026-10-18T17:08:53Z",
+        "event_type": "carrier",
+        "exception": "none",
+        "phase": "labelled",
+        "status_type": "success",
+        "sub_status": "none"
+      },
+      {
+        "description": "Ready to send",
+        "event_at": "2026-10-18T17:08:44Z",
+        "event_type": "internal",
+        "exception": "none",
+        "phase": "ready_to_send",
+        "status_type": "success",
+        "sub_status": "none"
+      },
+      {
+        "description": "Being announced",
+        "event_at": "2026-10-18T17:08:43Z",
+        "event_type": "internal",
+        "exception": "none",
+        "phase": "announcing",
+        "status_type": "success",
+        "sub_status": "none"
+      }
+    ],
+    "from_address": {
+      "address_line_1": "1 Example Street",
+      "address_line_2": "",
+      "city": "Example City",
+      "company_name": "Example Ltd",
+      "country_code": "GB",
+      "email": "person@example.com",
+      "house_number": "",
+      "name": "Example Person",
+      "phone_number": "+440000000000",
+      "po_box": null,
+      "postal_code": "EX1 1AA",
+      "state_province_code": null
+    },
+    "parcel_items": null,
+    "ship_with": {
+      "properties": {
+        "contract_id": 71427203,
+        "shipping_option_code": "royal_mailv2:tracked_returns_48/size=s,labelless",
+        "user_shipping_method_id": null,
+        "user_shipping_method_name": null
+      },
+      "type": "shipping_option_code"
+    },
+    "source_id": "729018065",
+    "to_address": {
+      "address_line_1": "1 Example Street",
+      "address_line_2": "",
+      "city": "Example City",
+      "company_name": "Example Ltd",
+      "country_code": "GB",
+      "email": "person@example.com",
+      "house_number": "",
+      "name": "Example Person",
+      "phone_number": "+440000000000",
+      "po_box": null,
+      "postal_code": "EX1 1AA",
+      "state_province_code": null
+    },
+    "tracking_numbers": [
+      {
+        "carrier_code": "royal_mailv2",
+        "tracking_identifier": null,
+        "tracking_number": "SCEXAMPLE0003",
+        "tracking_url": "https://tracking.example.com/track"
+      }
+    ],
+    "updated_at": "2026-10-18T17:09:44.690247Z"
+  }
+}
