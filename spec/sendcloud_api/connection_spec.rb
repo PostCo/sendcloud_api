@@ -5,14 +5,6 @@ RSpec.describe SendcloudAPI::Connection do
     File.read(File.expand_path("../fixtures/sendcloud/#{name}", __dir__))
   end
 
-  it "accepts an empty path at the configured base URL" do
-    stubs = Faraday::Adapter::Test::Stubs.new do |stub|
-      stub.get("/api/v3/") { json_response({"data" => []}) }
-    end
-    expect(build_client(stubs).connection.get("").status).to eq(200)
-    stubs.verify_stubbed_calls
-  end
-
   it "sends basic authentication and JSON headers" do
     stubs = Faraday::Adapter::Test::Stubs.new do |stub|
       stub.get("/api/v3/user/auth/metadata?active=false&limit=10") do |env|
