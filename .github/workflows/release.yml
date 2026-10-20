@@ -14,7 +14,7 @@ concurrency:
 jobs:
   test:
     if: github.repository == 'PostCo/sendcloud_api'
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     permissions:
       contents: read
     steps:
@@ -33,7 +33,7 @@ jobs:
   publish:
     needs: test
     if: github.repository == 'PostCo/sendcloud_api'
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     environment: release
     permissions:
       contents: read
