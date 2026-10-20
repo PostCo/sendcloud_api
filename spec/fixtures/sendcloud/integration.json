@@ -1,0 +1,17 @@
+{
+  "data": {
+    "created_at": "2026-10-16T10:10:29.326360Z",
+    "feedback_type": null,
+    "id": 637034,
+    "last_fetched_at": null,
+    "service_point_carriers": [],
+    "service_point_enabled": false,
+    "shop_name": "PostCo dev test",
+    "shop_url": null,
+    "started_failing_at": null,
+    "type": "api",
+    "updated_at": "2026-10-16T10:35:28.826994Z",
+    "webhook_active": false,
+    "webhook_url": "https://example.com/webhooks/sendcloud"
+  }
+}

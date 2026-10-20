@@ -1,0 +1,30 @@
+{
+  "data": [
+    {
+      "carrier": {
+        "code": "royal_mailv2",
+        "name": "Royal Mail by Sendcloud"
+      },
+      "client_id": "",
+      "country_code": "GB",
+      "id": 351090,
+      "is_default_per_carrier": false,
+      "name": "Royal Mail Transactional Contract (New Business)",
+      "state": "validating",
+      "type": "broker"
+    },
+    {
+      "carrier": {
+        "code": "bring",
+        "name": "Bring"
+      },
+      "client_id": "",
+      "country_code": "DK",
+      "id": 348920,
+      "is_default_per_carrier": false,
+      "name": "Bring TRX DK",
+      "state": "validating",
+      "type": "broker"
+    }
+  ]
+}

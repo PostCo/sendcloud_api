@@ -1,0 +1,13 @@
+{
+  "errors": [
+    {
+      "code": "value_error",
+      "detail": "Value error, webhook_url cannot be blank",
+      "source": {
+        "pointer": "body"
+      },
+      "status": 400,
+      "title": "Value Error"
+    }
+  ]
+}

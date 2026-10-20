@@ -29,6 +29,38 @@ module SendcloudAPI
       )
     end
 
+    def returns
+      @returns ||= Resources::Returns.new(connection)
+    end
+
+    def shipping_options
+      @shipping_options ||= Resources::ShippingOptions.new(connection)
+    end
+
+    def parcel_documents
+      @parcel_documents ||= Resources::ParcelDocuments.new(connection)
+    end
+
+    def parcel_tracking
+      @parcel_tracking ||= Resources::ParcelTracking.new(connection)
+    end
+
+    def contracts
+      @contracts ||= Resources::Contracts.new(connection)
+    end
+
+    def integrations
+      @integrations ||= Resources::Integrations.new(connection)
+    end
+
+    def user
+      @user ||= Resources::User.new(connection)
+    end
+
+    def invoice_items
+      @invoice_items ||= Resources::InvoiceItems.new(connection)
+    end
+
     def inspect
       "#<#{self.class}>"
     end

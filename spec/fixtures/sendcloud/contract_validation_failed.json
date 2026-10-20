@@ -1,0 +1,15 @@
+{
+  "data": {
+    "carrier": {
+      "code": "dpd_gb",
+      "name": "DPD UK"
+    },
+    "client_id": "postco-probe-fake",
+    "error": "We couldn't activate your carrier contract with the provided details. Please check your information and try again. If the issue persists, please contact your carrier representative.",
+    "id": 355760,
+    "is_default_per_carrier": false,
+    "name": "PostCo probe fake DPD UK",
+    "state": "validation_failed",
+    "type": "direct"
+  }
+}

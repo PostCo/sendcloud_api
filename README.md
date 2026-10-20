@@ -3,8 +3,8 @@
 `sendcloud_api` is a Ruby client for the [Sendcloud API v3](https://sendcloud.dev/api/v3).
 Each call sends one HTTP request without automatic retries. The caller owns idempotency, recovery, and business policy.
 
-Version `0.0.0` provides the client and connection. Endpoint resources arrive in the next PR and version `0.1.0`.
-This scaffold has no published release. Ruby 3.3 or newer is required.
+Version `0.1.0` adds resources for returns, shipping options, parcel documents and tracking, contracts, integrations, account metadata, invoice items, and webhook signatures.
+Ruby 3.3 or newer is required.
 
 ## Authentication
 
@@ -34,6 +34,124 @@ client = SendcloudAPI::Client.new(
   adapter: [:test, stubs]
 )
 ```
+
+## Resources
+
+Each resource method sends one request and returns a `SendcloudAPI::Response` with Sendcloud's body unchanged.
+Payloads are Hashes with Sendcloud's JSON field names as String keys. List filters are keyword arguments with Sendcloud's query parameter names.
+An unknown filter raises `ArgumentError` before any request is sent, because Sendcloud ignores unknown filters and returns every record.
+Ids and tracking numbers are required and are escaped into one path segment.
+
+### Returns
+
+```ruby
+created = client.returns.create(payload: {
+  "from_address" => from_address,
+  "to_address" => to_address,
+  "ship_with" => {"type" => "shipping_option_code", "shipping_option_code" => "sendcloud:letterreturn"},
+  "weight" => {"value" => 0.5, "unit" => "kg"},
+  "external_reference" => "postco-123"
+})
+return_id = created.body["return_id"]
+parcel_id = created.body["parcel_id"]
+
+client.returns.validate(payload: return_payload)
+client.returns.retrieve(id: return_id)
+client.returns.list(page_size: 40, from_date: "2026-10-01 00:00:00", to_date: "2026-10-31 00:00:00")
+client.returns.cancel(id: return_id)
+```
+
+Keep the `parcel_id` from the create response. `retrieve` returns the return without a `data` wrapper and without `parcel_id` or `external_reference`.
+The return's `status` stays `open`. The parcel's progress is the last `parent_status` in `status_history`, such as `ready-to-send` or `cancelled`.
+A second return with a used `external_reference` raises `ConflictError`, which is not ambiguous and carries no return id.
+`cancel` answers HTTP 202. Read the return to see the parcel reach `cancelled`.
+`validate` only checks a return, so its failures are never ambiguous.
+
+### Shipping options
+
+```ruby
+client.shipping_options.search(payload: {
+  "from_country_code" => "GB",
+  "to_country_code" => "GB",
+  "functionalities" => {"returns" => true},
+  "parcels" => [{"weight" => {"value" => 1, "unit" => "kg"}}],
+  "calculate_quotes" => true
+})
+```
+
+The search only reads, so its failures are never ambiguous.
+
+### Parcel documents
+
+```ruby
+label = client.parcel_documents.retrieve(parcel_id: parcel_id, type: "label", format: :png, dpi: 300)
+label.body         # PNG bytes
+label.content_type # "image/png"
+```
+
+`format` is `:pdf`, `:png`, or `:zpl` and sets the Accept header. The optional filters are `dpi` and `paper_size`.
+Label documents can take a few seconds to appear after a return is created. Until then Sendcloud answers HTTP 404, which raises `NotFoundError`.
+A carrier-native ZPL label is always returned as ZPL. A `:pdf` or `:png` request for one raises `ParseError` with `ambiguous? == false` and `error.response.content_type == "application/zpl"`.
+Request it again with `format: :zpl`.
+
+### Parcel tracking
+
+```ruby
+client.parcel_tracking.retrieve(tracking_number: tracking_number)
+```
+
+Sendcloud answers HTTP 404 for a parcel its tracking service has not registered yet.
+
+### Contracts
+
+```ruby
+client.contracts.schemas(carrier_code: "dpd_gb")
+client.contracts.list(carrier_code: "dpd_gb", is_active: true, page_size: 100)
+contract = client.contracts.create(payload: {"carrier_code" => "dpd_gb", "is_active" => false, "contract_data" => contract_data})
+client.contracts.retrieve(id: contract_id)
+client.contracts.update(id: contract_id, payload: {"is_active" => true})
+client.contracts.delete(id: contract_id)
+```
+
+A new contract starts in the `validating` state. Read it again to see `active` or `validation_failed`.
+
+### Integrations, account metadata, and invoice items
+
+```ruby
+client.integrations.retrieve(id: integration_id)
+client.integrations.update(id: integration_id, payload: {"webhook_active" => true, "webhook_url" => url})
+client.user.auth_metadata
+client.invoice_items.list(parcel_id: parcel_id, type: "shipment", created_after: "2026-10-01T00:00:00Z")
+```
+
+An integration update answers HTTP 204 with no body.
+
+### Pagination
+
+List methods return one page. Pass the cursor from `SendcloudAPI::Pagination.next_cursor` to fetch the next one.
+It reads the `Link` header that contracts and invoice items use, and the body `next` URL that returns use, and returns `nil` on the last page.
+
+```ruby
+page = client.invoice_items.list(page_size: 100)
+while (cursor = SendcloudAPI::Pagination.next_cursor(page))
+  page = client.invoice_items.list(page_size: 100, cursor: cursor)
+end
+```
+
+### Webhook signatures
+
+Sendcloud signs each webhook with the hex HMAC-SHA256 of the raw request body, keyed with the integration's secret key, in the `Sendcloud-Signature` header.
+
+```ruby
+valid = SendcloudAPI::WebhookSignature.verify(
+  request.raw_post,
+  request.headers[SendcloudAPI::WebhookSignature::HEADER],
+  secret_key
+)
+```
+
+Pass the unparsed body, because a parsed and encoded body has different bytes. The comparison runs in constant time.
+A missing, malformed, or wrong signature returns `false`. A body that is not a String or an empty secret raises `ArgumentError`.
 
 ## Requests and responses
 
@@ -147,8 +265,9 @@ Specs use Faraday's test adapter and a loopback HTTP server. They do not call Se
 The gemspec packages only the library, README, changelog, and license. The lockfile is not committed.
 
 Add endpoint classes under `SendcloudAPI::Resources` as subclasses of `Base`.
-They receive a connection in their constructor. Use `get` for nil-filter omission and `connection.post`, `connection.put`, `connection.patch`, or `connection.delete` for writes.
-`validate_payload!` checks String keys and required fields. `require_parameter!` checks required method arguments.
+They receive a connection in their constructor. Use `get(path, params:, allowed:, accept:)` for reads. It rejects filters missing from `allowed` and omits nil filters.
+Use `connection.post`, `connection.put`, `connection.patch`, or `connection.delete` for writes, and `read_only: true` for a POST that only reads.
+`validate_payload!` checks String keys and required fields. `segment` requires a path value and escapes it.
 Add explicit requires in `lib/sendcloud_api.rb` and memoized resource accessors in `Client`.
 
 ## Releases
@@ -161,4 +280,3 @@ Only that job can request an OIDC token, and it runs no repository code or depen
 Before the first release, register the RubyGems trusted publisher for owner `PostCo`, repository `sendcloud_api`, workflow `release.yml`, and environment `release`.
 See [RubyGems Trusted Publishing](https://guides.rubygems.org/trusted-publishing/).
 The local Bundler release task runs tests and lint before its tag and publication tasks, but does not enforce main ancestry.
-Version `0.0.0` is a scaffold. Do not tag or publish it.

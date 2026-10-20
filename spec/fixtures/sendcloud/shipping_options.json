@@ -1,0 +1,151 @@
+{
+  "data": [
+    {
+      "carrier": {
+        "code": "inpost_gb",
+        "name": "InPost GB"
+      },
+      "charging_type": "label_creation",
+      "code": "inpost_gb:lockertoaddress/returns,dropoff,labelless",
+      "contract": {
+        "carrier_code": "inpost_gb",
+        "client_id": "",
+        "id": 40353,
+        "name": "Sendcloud broker (bulk)"
+      },
+      "functionalities": {
+        "age_check": null,
+        "b2b": false,
+        "b2c": true,
+        "boxable": false,
+        "bulky_goods": false,
+        "carrier_billing_type": null,
+        "carrier_insurance": false,
+        "cash_on_delivery": null,
+        "customs_value_limit": null,
+        "dangerous_goods": false,
+        "delivery_attempts": 1,
+        "delivery_before": null,
+        "delivery_deadline": "best_effort",
+        "direct_contract_only": false,
+        "eco_delivery": false,
+        "ers": false,
+        "first_mile": "dropoff",
+        "flex_delivery": false,
+        "form_factor": "parcel",
+        "fragile_goods": false,
+        "fresh_goods": false,
+        "harmonized_label": false,
+        "id_check": false,
+        "incoterm": null,
+        "insurance": null,
+        "labelless": true,
+        "last_mile": "home_delivery",
+        "manually": false,
+        "multicollo": false,
+        "neighbor_delivery": false,
+        "non_conveyable": false,
+        "personalized_delivery": false,
+        "premium": false,
+        "priority": null,
+        "registered_delivery": false,
+        "returns": true,
+        "segment": null,
+        "service_area": "domestic",
+        "signature": false,
+        "size": null,
+        "sorted": false,
+        "surcharge": false,
+        "tracked": true,
+        "tyres": false,
+        "weekend_delivery": "saturday"
+      },
+      "max_dimensions": {
+        "height": "38.00",
+        "length": "64.00",
+        "unit": "cm",
+        "width": "41.00"
+      },
+      "name": "InPost Locker to Address Returns QR",
+      "parcel_billed_weights": [
+        {
+          "calculation": null,
+          "parcel_number": 1,
+          "unit": "kg",
+          "value": "1.000",
+          "volumetric": false
+        }
+      ],
+      "product": {
+        "code": "inpost_gb:lockertoaddress/returns",
+        "name": "InPost Locker to Address Returns"
+      },
+      "quote_error": null,
+      "quote_source": "sendcloud_prices",
+      "quotes": [
+        {
+          "estimated_surcharges": [],
+          "lead_time": null,
+          "price": {
+            "breakdown": [
+              {
+                "label": "Label",
+                "price": {
+                  "currency": "GBP",
+                  "value": "3.15"
+                },
+                "type": "price_without_insurance"
+              },
+              {
+                "label": "Shipment protection (tax-exempt)",
+                "price": {
+                  "currency": "GBP",
+                  "value": "0"
+                },
+                "type": "insurance_price"
+              },
+              {
+                "label": "Fuel surcharge (2.94%)",
+                "price": {
+                  "currency": "GBP",
+                  "value": "0.09"
+                },
+                "type": "fuel"
+              }
+            ],
+            "total": {
+              "currency": "GBP",
+              "value": "3.24"
+            }
+          },
+          "weight": {
+            "max": {
+              "unit": "kg",
+              "value": "15.001"
+            },
+            "min": {
+              "unit": "kg",
+              "value": "0.001"
+            }
+          }
+        }
+      ],
+      "requirements": {
+        "export_documents": false,
+        "fields": [],
+        "is_service_point_required": false
+      },
+      "weight": {
+        "max": {
+          "unit": "kg",
+          "value": "15.001"
+        },
+        "min": {
+          "unit": "kg",
+          "value": "0.001"
+        }
+      }
+    }
+  ],
+  "message": null
+}

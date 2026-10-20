@@ -1,0 +1,56 @@
+{
+  "data": [
+    {
+      "brand": null,
+      "carrier_id": 106,
+      "created_at": "2026-10-18T17:10:05.799506Z",
+      "description": "Credit requested for label",
+      "from_country": "GB",
+      "id": 527177337,
+      "integration": {
+        "id": 637034,
+        "name": "PostCo dev test"
+      },
+      "invoice_id": null,
+      "parcel_id": 729018065,
+      "pickup_id": null,
+      "price": {
+        "currency": "GBP",
+        "value": "-3.1300"
+      },
+      "reference": "SCEXAMPLE0003",
+      "subtype": null,
+      "tax": null,
+      "tax_rate": null,
+      "type": "parcel_cancelled",
+      "updated_at": "2026-10-18T17:10:05.799570Z",
+      "vat_code": null
+    },
+    {
+      "brand": null,
+      "carrier_id": 106,
+      "created_at": "2026-10-18T17:08:44.588686Z",
+      "description": "shipment: Royal Mail Tracked 48 Returns QR - Small Parcel",
+      "from_country": "GB",
+      "id": 527177215,
+      "integration": {
+        "id": 637034,
+        "name": "PostCo dev test"
+      },
+      "invoice_id": null,
+      "parcel_id": 729018065,
+      "pickup_id": null,
+      "price": {
+        "currency": "GBP",
+        "value": "3.1300"
+      },
+      "reference": "SCEXAMPLE0003",
+      "subtype": null,
+      "tax": null,
+      "tax_rate": null,
+      "type": "shipment",
+      "updated_at": "2026-10-18T17:08:44.588721Z",
+      "vat_code": null
+    }
+  ]
+}

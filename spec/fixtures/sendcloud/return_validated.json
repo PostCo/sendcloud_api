@@ -1,0 +1,46 @@
+{
+  "collo_count": 1,
+  "country_state": null,
+  "customs_shipment_type": null,
+  "delivery_option": "drop_off_labelless",
+  "external_reference": "postco-probe-20261019-rm-qr-1",
+  "from_address": {
+    "address_line_1": "1 Example Street",
+    "address_line_2": "",
+    "city": "Example City",
+    "company_name": "Example Ltd",
+    "country_code": "GB",
+    "email": "person@example.com",
+    "house_number": "",
+    "name": "Example Person",
+    "phone_number": "+440000000000",
+    "postal_code": "EX1 1AA",
+    "state_province_code": null
+  },
+  "order_number": "PROBE-1002",
+  "send_tracking_emails": false,
+  "ship_with": {
+    "contract": 351090,
+    "shipping_option_code": "royal_mailv2:tracked_returns_48/size=s,labelless",
+    "type": "shipping_option_code"
+  },
+  "to_address": {
+    "address_line_1": "1 Example Street",
+    "address_line_2": "",
+    "city": "Example City",
+    "company_name": "Example Ltd",
+    "country_code": "GB",
+    "email": "person@example.com",
+    "house_number": "",
+    "name": "Example Person",
+    "phone_number": "+440000000000",
+    "postal_code": "EX1 1AA",
+    "state_province_code": null
+  },
+  "total_insured_value": null,
+  "total_order_value": null,
+  "weight": {
+    "unit": "kg",
+    "value": 0.5
+  }
+}
