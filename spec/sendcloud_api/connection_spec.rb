@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
 RSpec.describe SendcloudAPI::Connection do
+  def fixture(name)
+    File.read(File.expand_path("../fixtures/sendcloud/#{name}", __dir__))
+  end
+
   it "sends basic authentication and JSON headers" do
     stubs = Faraday::Adapter::Test::Stubs.new do |stub|
       stub.get("/api/v3/user/auth/metadata?active=false&limit=10") do |env|
@@ -17,8 +21,8 @@ RSpec.describe SendcloudAPI::Connection do
     expect(result.status).to eq(200)
     expect(result.body).to eq("data" => {"id" => 637034})
     expect(result.headers["x-request-id"]).to eq("request-1")
-    expect(result.raw_body).to eq('{"data":{"id":637034}}')
     expect(result.content_type).to eq("application/json")
+    expect(result).not_to respond_to(:raw_body)
     stubs.verify_stubbed_calls
   end
 
@@ -37,19 +41,47 @@ RSpec.describe SendcloudAPI::Connection do
     end
   end
 
-  {"application/pdf" => "%PDF-1.7\n\xFF\x00".b, "image/png" => "\x89PNG\r\n\x1A\n\xFF\x00".b,
-   "application/octet-stream" => "\xFF\x00".b, "text/plain" => "plain text"}.each do |content_type, bytes|
-    it "returns #{content_type} as raw bytes with the content type" do
+  {"application/pdf" => "%PDF-1.7\n(Basic Service) Tj\n\xFF\x00".b, "image/png" => "\x89PNG\r\n\x1A\n\xFF\x00".b,
+   "application/zpl" => "^XA^FDBasic Letter^FS^XZ".b}.each do |content_type, bytes|
+    it "returns #{content_type} documents unchanged when the caller accepts them" do
       stubs = Faraday::Adapter::Test::Stubs.new do |stub|
-        stub.get("/api/v3/test") { [200, {"Content-Type" => content_type}, bytes] }
+        stub.get("/api/v3/parcels/1/documents/label") do |env|
+          expect(env.request_headers["Accept"]).to eq(content_type)
+          [200, {"Content-Type" => content_type}, bytes]
+        end
       end
-      response = build_client(stubs).connection.get("test")
+      response = build_client(stubs).connection.get("parcels/1/documents/label", accept: content_type)
       expect(response.body).to eq(bytes)
-      expect(response.raw_body).to eq(bytes)
       expect(response.body.encoding).to eq(Encoding::BINARY)
       expect(response.content_type).to eq(content_type)
       stubs.verify_stubbed_calls
     end
+  end
+
+  {
+    ["image/png", "application/pdf"] => "Sendcloud returned application/pdf instead of image/png",
+    ["image/png", "application/json"] => "Sendcloud returned application/json instead of image/png",
+    ["application/json", "image/png"] => "Sendcloud returned image/png instead of JSON",
+    ["application/json", "text/plain"] => "Sendcloud returned text/plain instead of JSON"
+  }.each do |(accept, content_type), message|
+    it "rejects a #{content_type} read when the caller accepts #{accept}" do
+      stubs = Faraday::Adapter::Test::Stubs.new do |stub|
+        stub.get("/api/v3/test") { [200, {"Content-Type" => content_type}, "{}"] }
+      end
+      expect { build_client(stubs).connection.get("test", accept: accept) }.to raise_error(SendcloudAPI::ParseError, message) { |error|
+        expect(error).not_to be_ambiguous
+        expect(error.response.content_type).to eq(content_type)
+      }
+    end
+  end
+
+  it "raises the typed HTTP error with its JSON body for a rejected document request" do
+    stubs = Faraday::Adapter::Test::Stubs.new do |stub|
+      stub.get("/api/v3/parcels/1/documents/label") { [404, {"Content-Type" => "application/json"}, fixture("contract_not_found.json")] }
+    end
+    expect { build_client(stubs).connection.get("parcels/1/documents/label", accept: "application/pdf") }.to raise_error(SendcloudAPI::NotFoundError) { |error|
+      expect(error.body).to eq(JSON.parse(fixture("contract_not_found.json")))
+    }
   end
 
   ["application/json; charset=utf-8", "application/vnd.api+json", nil].each do |content_type|
@@ -95,7 +127,7 @@ RSpec.describe SendcloudAPI::Connection do
         expect(error.headers["retry-after"]).to eq("30")
         expect(error.retry_after).to eq("30")
         expect(error.body).to eq("errors" => [])
-        expect(error.raw_body).to eq('{"errors":[]}')
+        expect(error).not_to respond_to(:raw_body)
         expect(error).not_to be_ambiguous
         expect(error.request_method).to eq(:get)
         expect(error.request_path).to eq("test")
@@ -103,26 +135,41 @@ RSpec.describe SendcloudAPI::Connection do
     end
   end
 
-  it "combines Sendcloud field errors into the message and keeps the raw body" do
-    body = '{ "errors": [{"code":"invalid","field":"weight","message":"Must be positive"},{"code":"required","field":"country","message":"Required"}] }'
-    stubs = Faraday::Adapter::Test::Stubs.new do |stub|
-      stub.post("/api/v3/test") { [422, {"Content-Type" => "application/json"}, body] }
+  {
+    "HTTP 400 from POST /shipping-options with country XX, captured 2026-10-18T17:03:57Z (run 20261019-routes)" =>
+      ["shipping_options_invalid_country.json", 400, SendcloudAPI::BadRequestError,
+        'validation_error Value error, Country XX does not exist. {"pointer":"/from_address/country_code"}'],
+    "HTTP 404 from GET /contracts/355760 after deletion, captured 2026-10-18T17:12:41Z (run 20261019-contracts)" =>
+      ["contract_not_found.json", 404, SendcloudAPI::NotFoundError, "not_found Not found"],
+    "HTTP 409 from POST /returns with a used reference, captured 2026-10-18T17:07:55Z (run 20261019-returns)" =>
+      ["return_duplicate_reference.json", 409, SendcloudAPI::ConflictError,
+        "409 returns External reference has already been used in another return."],
+    "HTTP 400 from POST /returns/validate without parcel_items, captured 2026-10-18T17:11:10Z (run 20261019-customs)" =>
+      ["return_validation_missing_parcel_items.json", 400, SendcloudAPI::BadRequestError,
+        "400 parcel_items It's required to inform parcel_items for international returns"]
+  }.each do |source, (name, status, error_class, details)|
+    it "summarizes the Sendcloud #{source}" do
+      stubs = Faraday::Adapter::Test::Stubs.new do |stub|
+        stub.post("/api/v3/test") { [status, {"Content-Type" => "application/json"}, fixture(name)] }
+      end
+      expect { build_client(stubs).connection.post("test", payload: {}) }.to raise_error(error_class) { |error|
+        expect(error.message).to eq("Sendcloud request failed with HTTP #{status}: #{details}")
+        expect(error.body).to eq(JSON.parse(fixture(name)))
+      }
     end
-    expect { build_client(stubs).connection.post("test", payload: {}) }.to raise_error(SendcloudAPI::UnprocessableEntityError) { |error|
-      expect(error.message).to eq("Sendcloud request failed with HTTP 422: invalid weight Must be positive; required country Required")
-      expect(error.raw_body).to eq(body)
-      expect(error.body).to eq(JSON.parse(body))
-    }
   end
 
-  it "combines JSON:API title, detail and source into the message" do
+  it "caps the error details in the message and keeps every error in the body" do
+    errors = Array.new(300) { |index| {"code" => "invalid", "field" => "parcels[#{index}].weight", "message" => "Must be positive"} }
     stubs = Faraday::Adapter::Test::Stubs.new do |stub|
-      stub.get("/api/v3/test") do
-        json_response({"errors" => [{"status" => "400", "title" => "Invalid request", "detail" => "Unknown country", "source" => {"pointer" => "/country"}}]}, status: 400)
-      end
+      stub.post("/api/v3/test") { json_response({"errors" => errors}, status: 422) }
     end
-    expect { build_client(stubs).connection.get("test") }.to raise_error(SendcloudAPI::BadRequestError) { |error|
-      expect(error.message).to include("400 Invalid request Unknown country", '{"pointer":"/country"}')
+    expect { build_client(stubs).connection.post("test", payload: {}) }.to raise_error(SendcloudAPI::UnprocessableEntityError) { |error|
+      prefix = "Sendcloud request failed with HTTP 422: "
+      expect(error.message).to start_with("#{prefix}invalid parcels[0].weight Must be positive; ")
+      expect(error.message).to end_with("...")
+      expect(error.message.length).to eq(prefix.length + SendcloudAPI::Connection::ERROR_DETAILS_LIMIT + 3)
+      expect(error.body["errors"].length).to eq(300)
     }
   end
 

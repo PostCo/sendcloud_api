@@ -39,6 +39,15 @@ RSpec.describe SendcloudAPI::Client do
     stubs.verify_stubbed_calls
   end
 
+  it "rejects an invalid base URL without exposing it" do
+    expect {
+      described_class.new(public_key: "test-public-key", secret_key: "test-secret-key", base_url: "https://user:pw@exa mple.test/")
+    }.to raise_error(ArgumentError, "base_url is not a valid URL") { |error|
+      expect(error.full_message).not_to include("pw", "exa mple")
+      expect(error.cause).to be_nil
+    }
+  end
+
   it "lets resource subclasses share the connection and retain false filters" do
     stubs = Faraday::Adapter::Test::Stubs.new do |stub|
       stub.get("/api/v3/test?enabled=false") { json_response({"data" => []}) }

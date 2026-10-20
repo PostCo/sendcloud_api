@@ -67,6 +67,64 @@ RSpec.describe "Sendcloud write ambiguity" do
     end
   end
 
+  %i[get post put patch delete].each do |method|
+    it "treats a 200 text/html answer to #{method} as unreadable" do
+      stubs = Faraday::Adapter::Test::Stubs.new do |stub|
+        stub.public_send(method, "/api/v3/test") { [200, {"Content-Type" => "text/html"}, "<html>Maintenance</html>"] }
+      end
+      options = %i[get delete].include?(method) ? {params: {}} : {payload: {}}
+      expect { build_client(stubs).connection.public_send(method, "test", **options) }.to raise_error(SendcloudAPI::ParseError, "Sendcloud returned text/html instead of JSON") { |error|
+        expect(error.ambiguous?).to eq(method != :get)
+        expect(error.body).to eq("<html>Maintenance</html>")
+      }
+    end
+
+    it "rejects an invalid #{method} path before dispatch without exposing it" do
+      calls = 0
+      stubs = Faraday::Adapter::Test::Stubs.new do |stub|
+        stub.public_send(method, "/api/v3/test") { calls += 1 }
+      end
+      options = %i[get delete].include?(method) ? {params: {}} : {payload: {}}
+      expect { build_client(stubs).connection.public_send(method, "x y?token=abc def", **options) }.to raise_error(ArgumentError) { |error|
+        expect(error).not_to be_a(SendcloudAPI::Error)
+        expect(error.message).not_to include("x y", "token", "abc")
+        expect(error.full_message).not_to include("abc")
+        expect(error.cause).to be_nil
+      }
+      expect(calls).to eq(0)
+    end
+  end
+
+  it "returns a read-only POST result" do
+    stubs = Faraday::Adapter::Test::Stubs.new do |stub|
+      stub.post("/api/v3/shipping-options") { json_response({"data" => []}) }
+    end
+    expect(build_client(stubs).connection.post("shipping-options", payload: {}, read_only: true).body).to eq("data" => [])
+  end
+
+  {
+    timeout: SendcloudAPI::TransportError,
+    server: SendcloudAPI::ServerError,
+    invalid_json: SendcloudAPI::ParseError,
+    html: SendcloudAPI::ParseError
+  }.each do |failure, error_class|
+    it "never marks a read-only POST #{failure} ambiguous" do
+      stubs = Faraday::Adapter::Test::Stubs.new do |stub|
+        stub.post("/api/v3/returns/validate") do
+          raise Faraday::TimeoutError if failure == :timeout
+          next [503, {"Content-Type" => "application/json"}, '{"errors":[]}'] if failure == :server
+          next [200, {"Content-Type" => "application/json"}, "not-json"] if failure == :invalid_json
+
+          [200, {"Content-Type" => "text/html"}, "<html></html>"]
+        end
+      end
+      expect { build_client(stubs).connection.post("returns/validate", payload: {}, read_only: true) }.to raise_error(error_class) { |error|
+        expect(error).not_to be_ambiguous
+        expect(error.request_method).to eq(:post)
+      }
+    end
+  end
+
   it "rejects invalid JSON payloads before dispatch" do
     calls = 0
     stubs = Faraday::Adapter::Test::Stubs.new do |stub|

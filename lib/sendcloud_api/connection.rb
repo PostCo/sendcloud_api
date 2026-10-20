@@ -6,6 +6,8 @@ require "zlib"
 
 module SendcloudAPI
   class Connection
+    JSON_MEDIA_TYPE = "application/json"
+    ERROR_DETAILS_LIMIT = 1_000
     ERROR_CLASSES = {
       400 => BadRequestError,
       401 => AuthenticationError,
@@ -21,22 +23,23 @@ module SendcloudAPI
       authorization = Faraday::Utils.basic_header_from(public_key, secret_key)
       @redactor = Redactor.new([public_key, secret_key, authorization, authorization.delete_prefix("Basic ")])
       @http = Faraday.new(url: normalize_base_url(base_url)) do |connection|
-        connection.headers["Accept"] = "application/json"
-        connection.headers["Content-Type"] = "application/json"
+        connection.headers["Content-Type"] = JSON_MEDIA_TYPE
         connection.headers["User-Agent"] = "sendcloud_api/#{VERSION}"
         connection.headers["Authorization"] = authorization
         connection.options.open_timeout = open_timeout
         connection.options.timeout = timeout
         connection.adapter(*Array(adapter))
       end
+    rescue URI::InvalidURIError
+      raise ArgumentError, "base_url is not a valid URL", cause: nil
     end
 
-    def get(path, params: {})
-      request(:get, path, params: params)
+    def get(path, params: {}, accept: JSON_MEDIA_TYPE)
+      request(:get, path, params: params, accept: accept)
     end
 
-    def post(path, payload:)
-      request(:post, path, payload: payload)
+    def post(path, payload:, read_only: false)
+      request(:post, path, payload: payload, write: !read_only)
     end
 
     def put(path, payload:)
@@ -61,25 +64,22 @@ module SendcloudAPI
       base_url.end_with?("/") ? base_url : "#{base_url}/"
     end
 
-    def request(method, path, params: {}, payload: nil)
+    def request(method, path, params: {}, payload: nil, accept: JSON_MEDIA_TYPE, write: method != :get)
       body = serialize(payload) unless payload.nil?
       redactor = @redactor.with_sensitive_values([payload, params])
-      context = {request_method: method, request_path: redactor.filter(path.split("?").first)}
-      write = method != :get
+      context = {request_method: method, request_path: redactor.filter_text(path.split("?").first)}
 
-      raw_response = dispatch(method, path, body, params, context, write: write)
+      raw_response = dispatch(method, path, body, params, accept, context, write: write)
       headers = raw_response.headers.to_h.transform_keys { |key| key.to_s.downcase }
-      parsed_body, valid_json = parse_body(raw_response.body, headers)
-      values = {"headers" => headers, "body" => parsed_body}
-      redactor = redactor.with_sensitive_values(values)
-      sanitized = redactor.filter(values)
-      response = Response.new(status: raw_response.status, headers: sanitized.fetch("headers"),
-        body: sanitized.fetch("body"), raw_body: redactor.filter(raw_response.body))
+      kind, body, problem = decode(raw_response.status, raw_response.body, media_type(headers["content-type"]), accept.downcase)
+      redactor = redactor.with_sensitive_values([headers, body])
+      body = redactor.filter(body) if kind == :json
+      body = redactor.filter_text(body) if kind == :text
+      response = Response.new(status: raw_response.status, headers: redactor.filter(headers), body: body)
 
-      raise_for_status!(response, context, write: write)
-      if response.status != 204 && (!valid_json || (write && parsed_body.nil?))
-        raise ParseError.new("Sendcloud returned invalid or empty JSON", response: response, ambiguous: write, **context), cause: nil
-      end
+      raise_for_status!(response, redactor, context, write: write)
+      problem ||= "Sendcloud returned empty JSON" if write && body.nil? && response.status != 204
+      raise ParseError.new(redactor.filter_text(problem), response: response, ambiguous: write, **context), cause: nil if problem
 
       response
     end
@@ -87,30 +87,53 @@ module SendcloudAPI
     def serialize(payload)
       JSON.generate(payload)
     rescue JSON::GeneratorError => error
-      raise error.class, @redactor.with_sensitive_values(payload).filter(error.message), cause: nil
+      raise error.class, @redactor.with_sensitive_values(payload).filter_text(error.message), cause: nil
     end
 
-    def dispatch(method, path, body, params, context, write:)
-      @http.run_request(method, path, body, nil) do |request|
+    def dispatch(method, path, body, params, accept, context, write:)
+      @http.run_request(method, path, body, {"Accept" => accept}) do |request|
         request.params.update(params)
       end
+    rescue URI::InvalidURIError
+      raise ArgumentError, "path is not a valid URL path", cause: nil
     rescue Faraday::Error, Zlib::Error => error
       raise TransportError.new("Sendcloud transport failed (#{error.class})", ambiguous: write, **context), cause: nil
     end
 
-    def parse_body(body, headers)
-      return [nil, true] if body.nil? || body.empty?
+    def media_type(content_type)
+      content_type.to_s.split(";").first.to_s.strip.downcase
+    end
 
-      content_type = headers["content-type"].to_s.split(";").first.to_s.downcase
-      return [body.b, true] unless content_type.empty? || content_type == "application/json" || content_type.end_with?("+json")
+    def json_type?(media_type)
+      media_type == JSON_MEDIA_TYPE || media_type.end_with?("+json")
+    end
 
-      body = body.dup.force_encoding(Encoding::UTF_8)
-      return [body.scrub, false] unless body.valid_encoding?
+    def decode(status, body, media_type, accept)
+      return [:json, nil, nil] if body.nil? || body.empty?
 
-      parsed = JSON.parse(body)
-      valid_utf8?(parsed) ? [parsed, true] : [Redactor::FILTERED, false]
+      success = (200..299).cover?(status)
+      if success && !json_type?(accept)
+        return [:document, body.b, nil] if media_type == accept
+
+        return [:text, body.b, "Sendcloud returned #{media_type_name(media_type)} instead of #{accept}"]
+      end
+      return parse_json(body) if media_type.empty? || json_type?(media_type)
+
+      [:text, body.b, ("Sendcloud returned #{media_type_name(media_type)} instead of JSON" if success)]
+    end
+
+    def media_type_name(media_type)
+      media_type.empty? ? "no content type" : media_type
+    end
+
+    def parse_json(body)
+      text = body.dup.force_encoding(Encoding::UTF_8)
+      return [:text, text.scrub, "Sendcloud returned invalid JSON"] unless text.valid_encoding?
+
+      parsed = JSON.parse(text)
+      valid_utf8?(parsed) ? [:json, parsed, nil] : [:text, Redactor::FILTERED, "Sendcloud returned invalid JSON"]
     rescue JSON::ParserError
-      [body, false]
+      [:text, text, "Sendcloud returned invalid JSON"]
     end
 
     def valid_utf8?(value)
@@ -126,11 +149,13 @@ module SendcloudAPI
       end
     end
 
-    def raise_for_status!(response, context, write:)
+    def raise_for_status!(response, redactor, context, write:)
       return if response.success?
 
       error_class = ERROR_CLASSES.fetch(response.status) { (500..599).cover?(response.status) ? ServerError : Error }
-      message = ["Sendcloud request failed with HTTP #{response.status}", error_details(response.body)].compact.join(": ")
+      message = "Sendcloud request failed with HTTP #{response.status}"
+      details = error_details(response.body)
+      message += ": #{truncate(redactor.filter_text(details))}" if details
       raise error_class.new(message, response: response,
         ambiguous: write && (500..599).cover?(response.status), **context), cause: nil
     end
@@ -141,10 +166,14 @@ module SendcloudAPI
       details = body["errors"].filter_map do |error|
         next unless error.is_a?(Hash)
 
-        error.values_at("code", "field", "message", "status", "title", "detail", "source")
+        error.values_at("code", "field", "message", "title", "detail", "source")
           .compact.map { |value| value.is_a?(String) ? value : JSON.generate(value) }.join(" ")
       end.reject(&:empty?)
       details.join("; ") unless details.empty?
+    end
+
+    def truncate(details)
+      (details.length > ERROR_DETAILS_LIMIT) ? "#{details[0, ERROR_DETAILS_LIMIT]}..." : details
     end
   end
 end

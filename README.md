@@ -37,24 +37,42 @@ client = SendcloudAPI::Client.new(
 
 ## Requests and responses
 
-`client.connection` exposes `get(path, params: {})`, `post(path, payload:)`, `put(path, payload:)`, `patch(path, payload:)`, and `delete(path, params: {})`.
-Use endpoint paths relative to the configured base URL. Payloads are encoded as JSON without changing field names or amounts.
-HTTP redirects are returned as errors, without another request.
-
-Each successful call returns a `SendcloudAPI::Response` with `status`, normalized lowercase `headers`, `body`, and `raw_body`.
-`success?` identifies HTTP 200 through 299. `no_content?` identifies HTTP 204 or a nil body.
-
-JSON responses retain the provider's String keys. Content types ending in `+json` are JSON, too.
-A missing content type is treated as JSON. Other content types return the body as binary bytes, including PDF and PNG label documents.
-`response.content_type` retains the full Content-Type header, including parameters.
-`raw_body` retains the response bytes with credentials removed. Redaction can change bytes that contain credentials.
+`client.connection` exposes these methods:
 
 ```ruby
-response.status
-response.headers
-response.body
-response.raw_body
-response.content_type
+get(path, params: {}, accept: "application/json")
+post(path, payload:, read_only: false)
+put(path, payload:)
+patch(path, payload:)
+delete(path, params: {})
+```
+
+Use endpoint paths relative to the configured base URL. Payloads are encoded as JSON without changing field names or amounts.
+HTTP redirects are returned as errors, without another request.
+A path or base URL that is not a valid URL raises `ArgumentError` before any request is sent. The message omits the value.
+
+Each successful call returns a `SendcloudAPI::Response` with `status`, normalized lowercase `headers`, `body`, and `content_type`.
+`success?` identifies HTTP 200 through 299. `no_content?` identifies HTTP 204 or a nil body.
+
+Every request sends the `accept` value as its Accept header. By default the connection expects JSON.
+A JSON response keeps the provider's String keys. Content types ending in `+json` are JSON, and a missing content type is read as JSON.
+To fetch a document, pass its media type. Sendcloud's parcel documents endpoint returns `application/pdf`, `image/png`, or `application/zpl` depending on Accept.
+The body is then the unchanged response bytes in binary encoding.
+
+```ruby
+label = client.connection.get("parcels/#{parcel_id}/documents/label", accept: "image/png")
+label.body         # PNG bytes
+label.content_type # "image/png"
+```
+
+A successful response in a different format than the caller expected raises `ParseError`.
+That includes HTML answering a JSON request and ZPL answering a PNG request. Sendcloud returns native ZPL labels as ZPL whatever the Accept header says.
+
+Some Sendcloud POST endpoints only read, such as shipping option searches and return validation.
+Pass `read_only: true` for those so their failures are never reported as ambiguous writes.
+
+```ruby
+client.connection.post("shipping-options", payload: query, read_only: true)
 ```
 
 ## Errors and recovery
@@ -74,9 +92,9 @@ All errors below inherit from `SendcloudAPI::Error`.
 | 500 through 599 | `ServerError` |
 | Other unsuccessful statuses | `Error` |
 
-`TransportError` wraps Faraday and decompression failures. `ParseError` reports unreadable JSON.
+`TransportError` wraps Faraday and decompression failures. `ParseError` reports unreadable JSON or a response in an unexpected format.
 A non-204 write response with empty or null JSON also raises `ParseError`.
-HTTP errors take precedence over JSON parsing errors, so an unreadable HTTP 503 response raises `ServerError`.
+HTTP errors take precedence over parsing errors, so an unreadable HTTP 503 response raises `ServerError`.
 
 ```ruby
 begin
@@ -89,18 +107,24 @@ rescue SendcloudAPI::Error => error
 end
 ```
 
-HTTP errors expose `response`, `status`, `headers`, `body`, `raw_body`, and `retry_after`.
-Their messages combine Sendcloud's field-error `code`, `field`, and `message` values or JSON:API `status`, `title`, `detail`, and `source` values.
-The response and the message are sanitized before leaving the connection.
+HTTP errors expose `response`, `status`, `headers`, `body`, and `retry_after`.
+Their messages join each error's `code`, `field`, `message`, `title`, `detail`, and `source` values.
+That covers both Sendcloud error shapes: `{code, detail, source, status}` from validation and lookups, and `{code, field, message}` from returns.
+The joined details are capped at 1,000 characters. The body keeps every error.
 
-`error.ambiguous?` is true for a POST, PUT, PATCH, or DELETE that fails in transport, receives HTTP 5xx, or returns unreadable JSON.
+`error.ambiguous?` is true for a POST, PUT, PATCH, or DELETE that fails in transport, receives HTTP 5xx, or returns an unreadable or unexpected response.
 A write may already have applied. Read the provider's current state and reconcile the result before deciding whether to retry.
-Reads and HTTP 4xx rejections have `ambiguous? == false`. This flag describes mutation uncertainty, not retryability.
+Reads, `read_only: true` POSTs, and HTTP 4xx rejections have `ambiguous? == false`. This flag describes mutation uncertainty, not retryability.
 `request_method` is a Symbol. `request_path` omits query parameters.
 Invalid JSON input fails before dispatch and raises `JSON::GeneratorError`.
 
-The transport filters the configured keys, their Basic authorization value, credential-bearing fields, and echoed credentials from response bodies and headers.
-It learns additional credential values from submitted payloads and response fields before redacting echoes.
+The connection removes credentials before a response or error leaves it.
+It knows the configured keys and their Basic authorization value, and it learns more from submitted and returned fields whose names look like credentials.
+A known value of 8 or more bytes is removed wherever it appears. A shorter value is removed only where it is the whole string, so it cannot alter identifiers such as tracking numbers.
+Fields named like credentials are replaced with `[FILTERED]`. Field names are never changed.
+Successful JSON gets only those two rules, so ordinary text such as "Basic Letter" or a signed URL stays intact.
+Error messages and non-JSON error bodies also lose `Basic` and `Bearer` values, `name=value` or `name: value` credentials, and URL user information.
+Accepted documents are returned byte for byte.
 Redaction does not change caller-owned inputs or outbound payloads.
 Client, connection, resource, redactor, and response inspection omit authentication state and payloads.
 Transport errors omit the upstream message and cause because those can retain the authenticated request.

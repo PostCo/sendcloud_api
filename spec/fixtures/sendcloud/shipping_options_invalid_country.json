@@ -1,0 +1,15 @@
+{
+  "errors": [
+    {
+      "code": "validation_error",
+      "detail": "Value error, Country XX does not exist.",
+      "meta": {
+        "error": "Country XX does not exist."
+      },
+      "source": {
+        "pointer": "/from_address/country_code"
+      },
+      "status": "400"
+    }
+  ]
+}

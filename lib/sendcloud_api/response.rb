@@ -2,13 +2,12 @@
 
 module SendcloudAPI
   class Response
-    attr_reader :status, :headers, :body, :raw_body
+    attr_reader :status, :headers, :body
 
-    def initialize(status:, headers:, body:, raw_body:)
+    def initialize(status:, headers:, body:)
       @status = status
       @headers = headers.freeze
       @body = body
-      @raw_body = raw_body
       freeze
     end
 

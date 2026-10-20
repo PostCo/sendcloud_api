@@ -1,0 +1,9 @@
+{
+  "errors": [
+    {
+      "code": "not_found",
+      "detail": "Not found",
+      "status": "404"
+    }
+  ]
+}

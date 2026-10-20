@@ -28,10 +28,6 @@ module SendcloudAPI
       response&.body
     end
 
-    def raw_body
-      response&.raw_body
-    end
-
     def retry_after
       headers&.fetch("retry-after", nil)
     end
