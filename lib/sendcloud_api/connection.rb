@@ -68,7 +68,7 @@ module SendcloudAPI
     def request(method, path, params: {}, payload: nil, accept: JSON_MEDIA_TYPE, write: method != :get)
       raise ArgumentError, "path must be relative to the base URL, without a scheme or leading slash" if path.match?(NOT_RELATIVE_PATH)
 
-      raise ArgumentError, "path must not contain . or .. segments" if path.split(/[?#]/, 2).first.split("/").any? { |segment| segment == "." || segment == ".." }
+      raise ArgumentError, "path must not contain . or .. segments" if path.split(/[?#]/, 2).first.to_s.split("/").any? { |segment| segment == "." || segment == ".." }
 
       body = serialize(payload) unless payload.nil?
       redactor = @redactor.with_sensitive_values([payload, params])
