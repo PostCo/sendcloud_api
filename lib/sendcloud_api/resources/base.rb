@@ -26,6 +26,8 @@ module SendcloudAPI
 
       def segment(name, value)
         require_parameter!(name, value)
+        raise ArgumentError, "#{name} cannot be . or .." if %w[. ..].include?(value.to_s)
+
         URI.encode_www_form_component(value.to_s).gsub("+", "%20")
       end
 
