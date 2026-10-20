@@ -8,6 +8,7 @@ module SendcloudAPI
   class Connection
     JSON_MEDIA_TYPE = "application/json"
     ERROR_DETAILS_LIMIT = 1_000
+    NOT_RELATIVE_PATH = %r{\A(?:/|[a-z][a-z0-9+.-]*:)}i
     ERROR_CLASSES = {
       400 => BadRequestError,
       401 => AuthenticationError,
@@ -65,7 +66,7 @@ module SendcloudAPI
     end
 
     def request(method, path, params: {}, payload: nil, accept: JSON_MEDIA_TYPE, write: method != :get)
-      raise ArgumentError, "path must be relative to the base URL, without a leading slash" if path.start_with?("/")
+      raise ArgumentError, "path must be relative to the base URL, without a scheme or leading slash" if path.match?(NOT_RELATIVE_PATH)
 
       body = serialize(payload) unless payload.nil?
       redactor = @redactor.with_sensitive_values([payload, params])

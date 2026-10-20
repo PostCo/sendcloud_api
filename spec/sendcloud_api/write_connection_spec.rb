@@ -94,17 +94,16 @@ RSpec.describe "Sendcloud write ambiguity" do
       expect(calls).to eq(0)
     end
 
-    it "rejects a #{method} path with a leading slash before dispatch" do
-      calls = 0
-      stubs = Faraday::Adapter::Test::Stubs.new do |stub|
-        stub.public_send(method, "/test") { calls += 1 }
-        stub.public_send(method, "/api/v3/test") { calls += 1 }
+    ["/test", "//evil.example/x", "https://evil.example/x", "HTTPS://evil.example/x", "mailto:a@evil.example"].each do |path|
+      it "rejects #{method} #{path} before dispatch" do
+        calls = 0
+        stubs = Faraday::Adapter::Test::Stubs.new { |stub| stub.public_send(method, /.*/) { calls += 1 } }
+        options = %i[get delete].include?(method) ? {params: {}} : {payload: {}}
+        expect { build_client(stubs).connection.public_send(method, path, **options) }.to raise_error(
+          ArgumentError, "path must be relative to the base URL, without a scheme or leading slash"
+        )
+        expect(calls).to eq(0)
       end
-      options = %i[get delete].include?(method) ? {params: {}} : {payload: {}}
-      expect { build_client(stubs).connection.public_send(method, "/test", **options) }.to raise_error(
-        ArgumentError, "path must be relative to the base URL, without a leading slash"
-      )
-      expect(calls).to eq(0)
     end
   end
 

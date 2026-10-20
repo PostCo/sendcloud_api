@@ -50,7 +50,7 @@ delete(path, params: {})
 Use endpoint paths relative to the configured base URL. Payloads are encoded as JSON without changing field names or amounts.
 HTTP redirects are returned as errors, without another request.
 A path or base URL that is not a valid URL raises `ArgumentError` before any request is sent. The message omits the value.
-A path that starts with `/` also raises `ArgumentError` before sending, because it would replace the base URL's `/api/v3/`.
+A path that starts with `/` or a scheme such as `https:` also raises `ArgumentError` before sending. A leading `/` would replace the base URL's `/api/v3/`, and an absolute URL would send the Authorization header to another host.
 
 Each successful call returns a `SendcloudAPI::Response` with `status`, normalized lowercase `headers`, `body`, and `content_type`.
 `success?` identifies HTTP 200 through 299. `no_content?` identifies HTTP 204 or a nil body.
