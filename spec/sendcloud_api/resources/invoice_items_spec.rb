@@ -1,21 +1,31 @@
 # frozen_string_literal: true
 
 RSpec.describe SendcloudAPI::Resources::InvoiceItems do
-  it "lists invoice items for a parcel and keeps its filters on every page" do
-    link = '<https://panel.sendcloud.sc/api/v3/invoice-items?cursor=bz0xJnI9MCZwPTUyNzE3NzIxNQ%3D%3D&page_size=1>; rel="next"'
-    client = serve(:get, "invoice-items", body: fixture("invoice_items.json"), headers: {"Link" => link})
-    filters = {parcel_id: 729018065, type: "shipment", page_size: 1}
-    response = client.invoice_items.list(**filters)
-
-    expect(request.params).to eq("parcel_id" => "729018065", "type" => "shipment", "page_size" => "1")
-    expect(response.body["data"].map { _1["type"] }).to eq(%w[parcel_cancelled shipment])
-
-    params = filters
-    2.times do
-      params = SendcloudAPI::Pagination.next_params(response, params)
-      response = client.invoice_items.list(**params)
-      expect(request.params).to eq("parcel_id" => "729018065", "type" => "shipment", "page_size" => "1", "cursor" => "bz0xJnI9MCZwPTUyNzE3NzIxNQ==")
+  it "follows next_params with exactly one request per page and the same filters on every page" do
+    following = {nil => "bz0xJnI9MCZwPTUyNzE3NzIxNQ==", "bz0xJnI9MCZwPTUyNzE3NzIxNQ==" => "bz0yJnI9MCZwPTUyNzE3NzIwMA==", "bz0yJnI9MCZwPTUyNzE3NzIwMA==" => nil}
+    sent = []
+    @stubs = Faraday::Adapter::Test::Stubs.new do |stub|
+      stub.get("/api/v3/invoice-items") do |env|
+        sent << env.params.dup
+        cursor = following.fetch(env.params["cursor"])
+        link = cursor && %(<https://panel.sendcloud.sc/api/v3/invoice-items?cursor=#{URI.encode_www_form_component(cursor)}&page_size=1>; rel="next")
+        json_response(fixture("invoice_items.json"), headers: link ? {"Link" => link} : {})
+      end
     end
+    client = build_client(@stubs)
+
+    pages = []
+    params = {parcel_id: 729018065, type: "shipment", page_size: 1}
+    while params && pages.size <= following.size
+      pages << client.invoice_items.list(**params)
+      params = SendcloudAPI::Pagination.next_params(pages.last, params)
+    end
+
+    expect(pages.size).to eq(3)
+    expect(sent.size).to eq(pages.size)
+    expect(sent.map { _1.except("cursor") }).to all(eq("parcel_id" => "729018065", "type" => "shipment", "page_size" => "1"))
+    expect(sent.map { _1["cursor"] }).to eq([nil, "bz0xJnI9MCZwPTUyNzE3NzIxNQ==", "bz0yJnI9MCZwPTUyNzE3NzIwMA=="])
+    expect(pages.first.body["data"].map { _1["type"] }).to eq(%w[parcel_cancelled shipment])
   end
 
   it "rejects unknown filters before sending" do

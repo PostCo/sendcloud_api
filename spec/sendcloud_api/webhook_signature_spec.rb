@@ -40,4 +40,31 @@ RSpec.describe SendcloudAPI::WebhookSignature do
     expect { described_class.verify(raw_body, signature, "") }.to raise_error(ArgumentError, "secret must be a non-empty String")
     expect { described_class.verify(raw_body, signature, nil) }.to raise_error(ArgumentError, "secret must be a non-empty String")
   end
+
+  describe "with a body Sendcloud delivered" do
+    let(:delivered_body) { File.binread(File.join(__dir__, "..", "fixtures", "sendcloud", "webhook_parcel_status_changed.json")) }
+    let(:delivered_signature) { OpenSSL::HMAC.hexdigest("SHA256", secret, delivered_body) }
+
+    it "keeps the recorded delivery byte for byte" do
+      expect(delivered_body.bytesize).to eq(4105)
+      expect(OpenSSL::Digest.hexdigest("SHA256", delivered_body)).to eq("4f7b480905e803f7ec1b6ec6b98ca558486e32be9d1fcdd9871f5a0c345e8166")
+    end
+
+    it "accepts its signature" do
+      expect(described_class.verify(delivered_body, delivered_signature, secret)).to be(true)
+    end
+
+    it "rejects it after any one byte changes" do
+      [0, delivered_body.bytesize / 2, delivered_body.bytesize - 1].each do |index|
+        changed = delivered_body.dup
+        changed.setbyte(index, changed.getbyte(index) ^ 0x01)
+        expect(described_class.verify(changed, delivered_signature, secret)).to be(false), "accepted a change at byte #{index}"
+      end
+    end
+
+    it "rejects it without a signature" do
+      expect(described_class.verify(delivered_body, nil, secret)).to be(false)
+      expect(described_class.verify(delivered_body, "", secret)).to be(false)
+    end
+  end
 end
