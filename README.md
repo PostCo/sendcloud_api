@@ -150,8 +150,9 @@ Add explicit requires in `lib/sendcloud_api.rb` and memoized resource accessors 
 ## Releases
 
 Publishing a GitHub release triggers `release.yml` only in `PostCo/sendcloud_api`.
-The workflow requires the source commit to be merged into `main`, checks that the tag matches `v<VERSION>`, runs tests and lint, and builds the gem.
-It publishes that artifact through RubyGems OIDC with the GitHub `release` environment.
+Its build job requires the source commit to be merged into `main`, checks that the tag matches `v<VERSION>`, refuses version `0.0.0`, runs tests and lint, builds the gem, and uploads it as an artifact.
+A second job in the GitHub `release` environment downloads that gem and pushes it through RubyGems OIDC.
+Only that job can request an OIDC token, and it runs no repository code or dependencies.
 
 Before the first release, register the RubyGems trusted publisher for owner `PostCo`, repository `sendcloud_api`, workflow `release.yml`, and environment `release`.
 See [RubyGems Trusted Publishing](https://guides.rubygems.org/trusted-publishing/).

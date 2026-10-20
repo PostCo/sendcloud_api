@@ -12,13 +12,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  build:
     if: github.repository == 'PostCo/sendcloud_api'
     runs-on: ubuntu-latest
-    environment: release
     permissions:
       contents: read
-      id-token: write
+    outputs:
+      gem_file: ${{ steps.version.outputs.gem_file }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -40,9 +40,10 @@ jobs:
         run: |
           bundle exec ruby -Ilib -rsendcloud_api/version <<'RUBY'
           version = SendcloudAPI::VERSION
+          abort "Version 0.0.0 is the unreleased scaffold" if version == "0.0.0"
           abort "Release tag must match v#{version}" unless ENV.fetch("RELEASE_TAG") == "v#{version}"
           abort "Invalid gem version" unless /\A\d+\.\d+\.\d+(?:\.[a-zA-Z0-9]+)*\z/.match?(version)
-          File.open(ENV.fetch("GITHUB_OUTPUT"), "a") { |file| file.puts "gem_path=pkg/sendcloud_api-#{version}.gem" }
+          File.open(ENV.fetch("GITHUB_OUTPUT"), "a") { |file| file.puts "gem_file=sendcloud_api-#{version}.gem" }
           RUBY
 
       - name: Test and lint
@@ -51,10 +52,35 @@ jobs:
       - name: Build gem
         run: bundle exec rake build
 
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gem
+          path: pkg/${{ steps.version.outputs.gem_file }}
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: github.repository == 'PostCo/sendcloud_api'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: gem
+          path: pkg
+
+      - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1
+        with:
+          ruby-version: "3.3"
+          bundler: none
+
       - name: Authenticate to RubyGems with GitHub OIDC
         uses: rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a # v2.1.0
 
-      - name: Publish the tested version
+      - name: Publish the tested gem
         env:
-          GEM_PATH_TO_PUSH: ${{ steps.version.outputs.gem_path }}
-        run: gem push "$GEM_PATH_TO_PUSH" --host https://rubygems.org
+          GEM_FILE: ${{ needs.build.outputs.gem_file }}
+        run: gem push "pkg/$GEM_FILE" --host https://rubygems.org
